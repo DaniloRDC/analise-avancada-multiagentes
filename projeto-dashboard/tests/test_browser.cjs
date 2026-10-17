@@ -1,12 +1,14 @@
 // Smoke/integration tests using Chrome's built-in DevTools Protocol (no packages).
 // Start a static server and Chrome with --remote-debugging-port=9222 first.
 const assert = require("node:assert/strict");
+const SITE_URL = process.env.TEST_SITE_URL || "http://127.0.0.1:8765/";
+const CDP_ENDPOINT = process.env.CDP_ENDPOINT || "http://127.0.0.1:9222";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main() {
-  const tabs = await fetch("http://127.0.0.1:9222/json/list").then((response) => response.json());
-  const page = tabs.find((tab) => tab.type === "page" && tab.url === "http://127.0.0.1:8765/");
+  const tabs = await fetch(`${CDP_ENDPOINT}/json/list`).then((response) => response.json());
+  const page = tabs.find((tab) => tab.type === "page" && tab.url === SITE_URL);
   assert.ok(page, "Chrome deve estar aberto no site servido por HTTP");
 
   const ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -79,6 +81,48 @@ async function main() {
     assert.ok(initial.categoryBarRoles.every(([role, tabindex, pressed]) => role === "button" && tabindex === "0" && pressed === "false"));
     assert.equal(new Set(initial.categoryFills).size, 1, "barras de categoria devem usar a mesma cor semântica");
     assert.equal(new Set(initial.cityFills).size, 1, "barras de cidade devem usar a mesma cor semântica");
+
+    const themeStart = await evaluate(`(() => {
+      const root = document.documentElement;
+      const original = root.dataset.theme;
+      const originalCanvas = getComputedStyle(root).getPropertyValue('--canvas').trim();
+      const originalBackground = getComputedStyle(document.body).backgroundColor;
+      const originalTextColor = getComputedStyle(document.body).color;
+      const originalSurface = getComputedStyle(document.querySelector('.panel')).backgroundColor;
+      const originalHeader = getComputedStyle(document.querySelector('th')).backgroundColor;
+      const originalSelect = getComputedStyle(document.querySelector('select')).backgroundColor;
+      document.querySelector('#theme-toggle').click();
+      return { original, originalCanvas, originalBackground, originalTextColor, originalSurface, originalHeader, originalSelect, switched: root.dataset.theme,
+        saved: localStorage.getItem('papelaria-theme'), actionLabel: document.querySelector('#theme-toggle').getAttribute('aria-label') };
+    })()`);
+    await delay(100);
+    const switchedVisuals = await evaluate(`({ background: getComputedStyle(document.body).backgroundColor,
+      textColor: getComputedStyle(document.body).color,
+      canvas: getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim(),
+      bodyCanvas: getComputedStyle(document.body).getPropertyValue('--canvas').trim(),
+      darkBodySelector: document.body.matches(':root[data-theme="dark"] body'),
+      darkPanelSelector: document.querySelector('.panel').matches(':root[data-theme="dark"] .panel'),
+      tableHeader: getComputedStyle(document.querySelector('th')).backgroundColor,
+      selectBackground: getComputedStyle(document.querySelector('select')).backgroundColor,
+      primaryKpiColor: getComputedStyle(document.querySelector('.kpi-card-primary .kpi-value')).color,
+      surface: getComputedStyle(document.querySelector('.panel')).backgroundColor })`);
+    assert.notEqual(themeStart.switched, themeStart.original, "o controle deve alternar o tema");
+    assert.equal(themeStart.saved, themeStart.switched, "a escolha deve ser salva");
+    assert.equal(themeStart.actionLabel, themeStart.switched === "dark" ? "Ativar tema claro" : "Ativar tema escuro");
+    assert.notEqual(switchedVisuals.canvas, themeStart.originalCanvas, `o tema alternativo deve trocar a paleta: ${JSON.stringify(switchedVisuals)}`);
+    assert.notEqual(switchedVisuals.background, themeStart.originalBackground, `o fundo deve acompanhar a paleta: ${JSON.stringify(switchedVisuals)}`);
+    assert.notEqual(switchedVisuals.textColor, themeStart.originalTextColor, `a cor do texto deve acompanhar o tema: ${JSON.stringify(switchedVisuals)}`);
+    assert.notEqual(switchedVisuals.surface, themeStart.originalSurface, `a superfície dos painéis deve acompanhar o tema: ${JSON.stringify(switchedVisuals)}`);
+    assert.notEqual(switchedVisuals.tableHeader, themeStart.originalHeader, `o cabeçalho da tabela deve acompanhar o tema: ${JSON.stringify(switchedVisuals)}`);
+    assert.notEqual(switchedVisuals.selectBackground, themeStart.originalSelect, `os filtros devem acompanhar o tema: ${JSON.stringify(switchedVisuals)}`);
+    if (themeStart.switched === "dark") assert.equal(switchedVisuals.primaryKpiColor, "rgb(255, 255, 255)", "o valor destacado precisa manter contraste no tema escuro");
+    const themeRestore = await evaluate(`(() => { document.querySelector('#theme-toggle').click(); return {
+      theme: document.documentElement.dataset.theme, saved: localStorage.getItem('papelaria-theme') } })()`);
+    const themeBehavior = { ...themeStart, ...switchedVisuals, restored: themeRestore.theme, restoredSaved: themeRestore.saved };
+    assert.deepEqual([themeBehavior.restored, themeBehavior.restoredSaved], [themeBehavior.original, themeBehavior.original]);
+    await send("Page.reload", { ignoreCache: true });
+    await delay(700);
+    assert.equal(await evaluate(`document.documentElement.dataset.theme`), themeBehavior.original, "a preferência salva deve continuar após recarregar");
 
     const initialTable = await evaluate(`fetch('dados/vendas.json').then(response => response.json()).then(data => {
       const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -297,7 +341,7 @@ async function main() {
     const recovered = await evaluate(`({ count: document.querySelector('#kpi-count').textContent, rows: document.querySelectorAll('#sales-body tr').length })`);
     assert.deepEqual(recovered, { count: "180", rows: 180 });
 
-    console.log(JSON.stringify({ status: "PASS", initial, byCategory, byCity, combined, empty, reset, keyboardSelection, desktop, mobile, keyboard, loadFailure, recovered, browserErrors }, null, 2));
+    console.log(JSON.stringify({ status: "PASS", initial, themeBehavior, byCategory, byCity, combined, empty, reset, keyboardSelection, desktop, mobile, keyboard, loadFailure, recovered, browserErrors }, null, 2));
   } finally {
     ws.close();
   }

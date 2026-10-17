@@ -5,78 +5,99 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Painel interativo de vendas da papelaria, por categoria e cidade.">
   <title>Vendas da papelaria | Painel</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <script>
+    (() => {
+      let savedTheme = null;
+      try { savedTheme = localStorage.getItem("papelaria-theme"); } catch {}
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = savedTheme === "dark" || savedTheme === "light" ? savedTheme : systemTheme;
+    })();
+  </script>
+  <link rel="stylesheet" href="styles.css?v=dark-mode">
+  <script src="app.js?v=theme-toggle" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
   <header class="hero">
     <div class="hero-inner">
       <div class="hero-copy">
-        <p class="hero-period">1º trimestre de 2026</p>
+        <p class="hero-period"><span class="period-mark" aria-hidden="true"></span> PAINEL DE VENDAS <span class="period-divider" aria-hidden="true">/</span> 1º TRIMESTRE DE 2026</p>
         <h1>Vendas da papelaria</h1>
-        <p class="intro">Uma visão simples do valor vendido, das transações e da distribuição por categoria e cidade.</p>
+        <p class="intro">Acompanhe o desempenho e explore os resultados por categoria e cidade.</p>
       </div>
-      <aside class="hero-source" aria-label="Sobre os dados">
-        <p class="source-label">Fonte dos dados</p>
-        <code>papelaria_limpa.csv</code>
-        <p class="source-note">Uma linha representa uma venda.</p>
-      </aside>
+      <div class="hero-tools">
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Ativar tema escuro">
+          <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.5 8.5 0 1 0 20.2 15.1Z"/></svg>
+          <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+          <span id="theme-toggle-label">Tema escuro</span>
+        </button>
+        <aside class="hero-source" aria-label="Sobre os dados">
+          <p class="source-label">BASE DE DADOS</p>
+          <code>papelaria_limpa.csv</code>
+          <p class="source-note"><span class="source-dot" aria-hidden="true"></span> Atualizado localmente · 180 transações</p>
+        </aside>
+      </div>
     </div>
   </header>
 
   <main id="conteudo" class="layout">
-    <div class="overview-grid">
-      <section class="filters panel" aria-labelledby="filters-title">
-        <div class="section-heading">
-          <h2 id="filters-title">Filtre as vendas</h2>
-          <button id="clear-filters" class="button button-secondary" type="button">Limpar filtros</button>
-        </div>
+    <section class="summary-section" aria-labelledby="summary-title">
+      <div class="section-heading section-heading-tight">
+        <div><p class="eyebrow">VISÃO GERAL</p><h2 id="summary-title">Resumo das vendas</h2></div>
+        <p class="section-note">Os indicadores acompanham os filtros selecionados.</p>
+      </div>
+      <div class="kpi-grid">
+        <article class="kpi-card kpi-card-primary"><p class="kpi-label">Valor total vendido</p><p id="kpi-total" class="kpi-value">—</p><p class="kpi-help">Soma do valor bruto das vendas</p></article>
+        <article class="kpi-card"><p class="kpi-label">Vendas <span>(transações)</span></p><p id="kpi-count" class="kpi-value">—</p><p class="kpi-help">Uma transação por linha do arquivo</p></article>
+        <article class="kpi-card"><p class="kpi-label">Ticket médio</p><p id="kpi-average" class="kpi-value">—</p><p class="kpi-help">Total vendido ÷ transações</p></article>
+      </div>
+    </section>
+
+    <section class="filters panel" aria-labelledby="filters-title">
+      <div class="filters-intro">
+        <p class="eyebrow">EXPLORE OS DADOS</p>
+        <h2 id="filters-title">Refinar resultados</h2>
+        <p>Escolha uma categoria ou cidade para atualizar o painel.</p>
+      </div>
+      <div class="filters-main">
         <div class="filter-controls">
           <label for="category-filter">Categoria
-            <select id="category-filter"><option value="">Todas as categorias</option></select>
+            <select id="category-filter" aria-controls="kpi-total kpi-count kpi-average category-chart city-chart sales-body"><option value="">Todas as categorias</option></select>
           </label>
           <label for="city-filter">Cidade
-            <select id="city-filter"><option value="">Todas as cidades</option></select>
+            <select id="city-filter" aria-controls="kpi-total kpi-count kpi-average category-chart city-chart sales-body"><option value="">Todas as cidades</option></select>
           </label>
         </div>
+        <button id="clear-filters" class="button button-secondary" type="button" aria-controls="kpi-total kpi-count kpi-average category-chart city-chart sales-body">Limpar filtros</button>
+      </div>
+      <div class="filters-status">
         <div id="active-filters" class="filter-chips" role="group" aria-label="Filtros aplicados" hidden></div>
         <p id="result-count" class="result-count" aria-live="polite">Carregando dados…</p>
-      </section>
-
-      <section class="summary-section" aria-labelledby="summary-title">
-        <div class="section-heading section-heading-tight">
-          <h2 id="summary-title">Indicadores do recorte</h2>
-        </div>
-        <div class="kpi-grid">
-          <article class="kpi-card"><p class="kpi-label">Valor total vendido</p><p id="kpi-total" class="kpi-value">—</p><p class="kpi-help">Soma do valor bruto das vendas</p></article>
-          <article class="kpi-card"><p class="kpi-label">Vendas (transações)</p><p id="kpi-count" class="kpi-value">—</p><p class="kpi-help">Uma transação por linha do arquivo</p></article>
-          <article class="kpi-card"><p class="kpi-label">Ticket médio</p><p id="kpi-average" class="kpi-value">—</p><p class="kpi-help">Total vendido dividido por transações</p></article>
-        </div>
-      </section>
-    </div>
+      </div>
+    </section>
 
     <section aria-labelledby="charts-title">
-      <div class="section-heading section-heading-tight"><h2 id="charts-title">Como o valor se distribui</h2></div>
+      <div class="section-heading section-heading-tight"><div><p class="eyebrow">DISTRIBUIÇÃO</p><h2 id="charts-title">Onde estão as vendas?</h2></div></div>
       <div class="chart-grid">
         <article class="panel chart-panel">
-          <h3>Por categoria</h3>
-          <p class="chart-caption">Valor vendido por categoria. Selecione uma barra para filtrar.</p>
-          <div id="category-chart" class="chart" role="group" aria-label="Gráfico de vendas por categoria; selecione uma barra para filtrar"></div>
+          <h3><span class="chart-index">01</span> Por categoria</h3>
+          <p id="category-chart-help" class="chart-caption">Valor vendido por categoria. Selecione uma barra para filtrar.</p>
+          <div id="category-chart" class="chart" role="group" aria-describedby="category-chart-help" aria-label="Gráfico de vendas por categoria; selecione uma barra para filtrar"></div>
         </article>
         <article class="panel chart-panel">
-          <h3>Por cidade</h3>
-          <p class="chart-caption">Valor vendido por cidade. Selecione uma barra para filtrar.</p>
-          <div id="city-chart" class="chart" role="group" aria-label="Gráfico de vendas por cidade; selecione uma barra para filtrar"></div>
+          <h3><span class="chart-index chart-index-warm">02</span> Por cidade</h3>
+          <p id="city-chart-help" class="chart-caption">Valor vendido por cidade. Selecione uma barra para filtrar.</p>
+          <div id="city-chart" class="chart" role="group" aria-describedby="city-chart-help" aria-label="Gráfico de vendas por cidade; selecione uma barra para filtrar"></div>
         </article>
       </div>
     </section>
 
     <section class="panel table-panel" aria-labelledby="table-title">
       <div class="section-heading">
-        <h2 id="table-title">Livro-caixa</h2>
+          <div><p class="eyebrow">DETALHAMENTO</p><h2 id="table-title">Todas as transações</h2></div>
+          <p class="section-note">Valores em reais · ordenados como na base original</p>
       </div>
-      <div class="table-scroll">
+      <div class="table-scroll" role="region" aria-label="Tabela de vendas; use a rolagem horizontal para ver todas as colunas" tabindex="0">
         <table>
           <caption class="visually-hidden">Registros de venda após aplicar os filtros selecionados</caption>
           <thead><tr><th scope="col">ID</th><th scope="col">Data</th><th scope="col">Cidade</th><th scope="col">Categoria</th><th scope="col">Produto</th><th scope="col">Unidades</th><th scope="col">Preço unitário</th><th scope="col">Pagamento</th><th scope="col">Valor da venda</th></tr></thead>

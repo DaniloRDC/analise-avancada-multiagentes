@@ -4,7 +4,36 @@ const DATA_URL = "dados/vendas.json";
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const svgNS = "http://www.w3.org/2000/svg";
+const themeToggle = document.querySelector("#theme-toggle");
+const themeToggleLabel = document.querySelector("#theme-toggle-label");
+const themeTokens = ["--ink", "--muted", "--line", "--canvas", "--surface", "--surface-soft", "--brand", "--brand-deep", "--brand-ink", "--brand-tint", "--accent", "--accent-tint", "--focus", "--hero", "--shadow", "--shadow-lift"];
 let sales = [];
+
+function updateThemeToggle() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  const action = dark ? "Ativar tema claro" : "Ativar tema escuro";
+  document.body.dataset.theme = dark ? "dark" : "light";
+  const rootStyles = getComputedStyle(document.documentElement);
+  for (const token of themeTokens) document.body.style.setProperty(token, rootStyles.getPropertyValue(token).trim());
+  document.documentElement.style.colorScheme = dark ? "dark" : "light";
+  document.body.style.color = "var(--ink)";
+  document.body.style.backgroundColor = rootStyles.getPropertyValue("--canvas").trim();
+  document.querySelectorAll(".panel, .hero-source, .kpi-card:not(.kpi-card-primary)")
+    .forEach((surface) => { surface.style.backgroundColor = rootStyles.getPropertyValue("--surface").trim(); });
+  document.querySelectorAll(".kpi-card-primary")
+    .forEach((card) => { card.style.backgroundColor = rootStyles.getPropertyValue("--brand-deep").trim(); });
+  themeToggle.setAttribute("aria-label", action);
+  themeToggleLabel.textContent = dark ? "Tema claro" : "Tema escuro";
+}
+
+themeToggle.addEventListener("click", () => {
+  const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = theme;
+  document.body.dataset.theme = theme;
+  try { localStorage.setItem("papelaria-theme", theme); } catch {}
+  updateThemeToggle();
+});
+updateThemeToggle();
 
 const elements = {
   category: document.querySelector("#category-filter"),
@@ -105,7 +134,7 @@ function renderChart(container, groups, label, field) {
   const plotHeight = height - margin.top - margin.bottom;
   const maxValue = Math.max(...groups.map((item) => item[1]), 1);
   const step = plotHeight / groups.length;
-  const barHeight = Math.min(34, step * 0.62);
+  const barHeight = Math.min(44, step * 0.82);
   const svg = svgElement("svg", { viewBox: `0 0 ${width} ${height}`, role: "group", "aria-label": `Barras por ${label.toLocaleLowerCase("pt-BR")}` });
   const tickCount = width < 420 ? 2 : 4;
   for (let tick = 0; tick <= tickCount; tick += 1) {

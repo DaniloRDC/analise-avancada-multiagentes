@@ -58,4 +58,4 @@ Para apenas visualizar o site manualmente, abra outro terminal PowerShell na pas
 
 Abra <http://localhost:8000> no navegador. A prévia 8000 é independente do servidor de teste 8765 e não substitui esse servidor ao executar o teste Chrome. `site/` é a pasta publicável em hospedagem estática; a publicação não está incluída nesta etapa. Não abra `index.html` diretamente como arquivo, pois o navegador pode bloquear a leitura do JSON.
 
-O painel contém indicadores, dois gráficos de barras, tabela e filtros de categoria e cidade. Os dois filtros atualizam todos esses elementos e podem ser usados por teclado; o botão **Limpar filtros** restaura a visão completa.
+O painel contém indicadores, dois gráficos de barras, tabela e filtros de categoria e cidade. Os dois filtros atualizam todos esses elementos e podem ser usados por teclado; o botão **Limpar filtros** restaura a visão completa. Use o controle no cabeçalho para alternar entre tema claro e escuro; a escolha fica salva neste navegador e, na primeira visita, o painel respeita o tema do sistema.
